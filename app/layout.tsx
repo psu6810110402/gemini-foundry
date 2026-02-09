@@ -5,6 +5,7 @@ import { Analytics } from "@vercel/analytics/next";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { Toaster } from "sonner";
 import "./globals.css";
 
 const inter = Inter({
@@ -41,17 +42,18 @@ export default function RootLayout({
       >
         <ThemeProvider
           attribute="class"
-          defaultTheme="light"
-          enableSystem={false}
+          defaultTheme="system"
+          enableSystem
           disableTransitionOnChange
         >
           <AuthProvider>
             <LanguageProvider>
               <ErrorBoundary>{children}</ErrorBoundary>
             </LanguageProvider>
+            <Toaster richColors position="top-center" />
+            <Analytics />
           </AuthProvider>
         </ThemeProvider>
-        <Analytics />
       </body>
     </html>
   );

@@ -25,6 +25,8 @@ const translations = {
   investor_mode: { TH: "🦈 จำลองนักลงทุน (VC)", EN: "🦈 Investor Simulator" },
   market_mode: { TH: "📊 วิเคราะห์ตลาด", EN: "📊 Market Synthesis" },
   mvp_mode: { TH: "🔧 สร้างแผน MVP", EN: "🔧 MVP Blueprint" },
+  pivot_mode: { TH: "🔄 หาทางรอด (Pivot)", EN: "🔄 Pivot Strategy" },
+  finance_mode: { TH: "💰 จำลอง CFO", EN: "💰 CFO Simulator" },
 
   // Placeholders
   market_placeholder: {

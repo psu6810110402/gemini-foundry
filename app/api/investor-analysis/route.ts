@@ -1,6 +1,7 @@
 // app/api/investor-analysis/route.ts
-import { model, PERSONAS, isApiConfigured } from "@/lib/gemini";
-import { InvestorAnalysisSchema } from "@/lib/schemas";
+import { isApiConfigured, generateStructuredContent } from "@/lib/gemini-server";
+import { PERSONAS } from "@/lib/gemini";
+import { InvestorAnalysisSchema, InvestorAnalysisOutputSchema } from "@/lib/schemas";
 import { NextResponse } from "next/server";
 import { trackApiUsage } from "@/lib/api-tracking";
 
@@ -10,9 +11,8 @@ export async function POST(req: Request) {
   try {
     // 0. Check API Key
     if (!isApiConfigured()) {
-      console.error("API Key check failed. GEMINI_API_KEY:", process.env.GEMINI_API_KEY ? "SET" : "NOT SET");
       return NextResponse.json(
-        { error: "GEMINI_API_KEY is not configured. Please restart the server after adding it to .env" },
+        { error: "GEMINI_API_KEY is not configured" },
         { status: 500 }
       );
     }
@@ -22,7 +22,6 @@ export async function POST(req: Request) {
     // 1. Validate Input with Zod
     const validation = InvestorAnalysisSchema.safeParse(body);
     if (!validation.success) {
-      console.error("Validation failed:", validation.error.issues);
       return NextResponse.json(
         { error: validation.error.issues[0].message }, 
         { status: 400 }
@@ -36,70 +35,34 @@ export async function POST(req: Request) {
     const userMessage = message ? `\n\nUser Message: ${message}` : "";
     const prompt = basePrompt + userMessage;
 
+    // 3. Generate Structured Content
     let result;
 
-    // 3. Handle with or without file
     if (image) {
-      // Detect MIME type from base64
-      const mimeMatch = image.match(/^data:([^;]+);base64,/);
-      const mimeType = mimeMatch ? mimeMatch[1] : "image/jpeg";
-      const base64Data = image.split(",")[1] || image;
-
-      console.log("Processing file with MIME type:", mimeType);
-
-      // Handle PDF differently
-      if (mimeType === "application/pdf") {
-        const pdfPrompt = `${basePrompt}\n\n[User uploaded a PDF file - please ask them to describe it or paste the text content]\n${userMessage || "Please analyze this business document."}`;
-        result = await model.generateContentStream(pdfPrompt);
-      } else {
-        // Image file
-        const imagePart = {
+       const mimeMatch = image.match(/^data:([^;]+);base64,/);
+       const mimeType = mimeMatch ? mimeMatch[1] : "image/jpeg";
+       const base64Data = image.split(",")[1] || image;
+      
+       const imagePart = {
           inlineData: {
             data: base64Data,
             mimeType: mimeType,
           },
         };
-        result = await model.generateContentStream([prompt, imagePart]);
-      }
-    } else if (message) {
-      // Text only
-      result = await model.generateContentStream(prompt);
+        // @ts-ignore - Part type mismatch between client/server files if any, but runtime is fine
+        result = await generateStructuredContent(
+          [prompt, imagePart],
+          InvestorAnalysisOutputSchema
+        );
     } else {
-      return NextResponse.json(
-        { error: "Please provide either an image or a message" },
-        { status: 400 }
-      );
+      result = await generateStructuredContent(prompt, InvestorAnalysisOutputSchema);
     }
 
-    // 4. Create Stream Response
-    const stream = new ReadableStream({
-      async start(controller) {
-        const encoder = new TextEncoder();
-        let totalTokens = 0;
-        try {
-          for await (const chunk of result.stream) {
-            const text = chunk.text();
-            if (text) {
-              controller.enqueue(encoder.encode(text));
-            }
-            if (chunk.usageMetadata) {
-              totalTokens = chunk.usageMetadata.totalTokenCount;
-            }
-          }
-        } catch (err) {
-          console.error("Stream error:", err);
-          controller.error(err);
-        } finally {
-          controller.close();
-          if (totalTokens > 0) {
-            trackApiUsage("/api/investor-analysis", totalTokens).catch(console.error);
-          }
-        }
+    // 4. Return JSON Response with Caching
+    return NextResponse.json(result, {
+      headers: {
+        "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400",
       },
-    });
-
-    return new NextResponse(stream, {
-      headers: { "Content-Type": "text/plain; charset=utf-8" }
     });
 
   } catch (error) {
@@ -121,7 +84,7 @@ export async function POST(req: Request) {
       );
     }
 
-    if (errorMessage.includes("429") || errorMessage.includes("quota") || errorMessage.includes("RESOURCE_EXHAUSTED")) {
+    if (errorMessage.includes("429") || errorMessage.includes("quota")) {
       return NextResponse.json(
         { error: "Rate limit exceeded. Please wait a minute and try again." },
         { status: 429 }

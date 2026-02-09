@@ -1,16 +1,16 @@
 // app/api/market-synthesis/route.ts
-import { model, PERSONAS, isApiConfigured } from "@/lib/gemini";
-import { MarketSynthesisSchema } from "@/lib/schemas";
+import { generateStructuredContent } from "@/lib/gemini-server";
+import { PERSONAS } from "@/lib/gemini";
+import { MarketSynthesisSchema, MarketSynthesisOutputSchema } from "@/lib/schemas";
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 
-// Use Node.js runtime for compatibility
 export const runtime = "nodejs";
 
 export async function POST(req: Request) {
   try {
     // 0. Check API Key
-    if (!isApiConfigured()) {
+    if (!process.env.GEMINI_API_KEY) {
       return NextResponse.json(
         { error: "GEMINI_API_KEY is not configured" },
         { status: 500 }
@@ -18,53 +18,40 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    const { marketData } = MarketSynthesisSchema.parse(body);
+    
+    // 1. Validate Input
+    const validation = MarketSynthesisSchema.safeParse(body);
+    if (!validation.success) {
+      return NextResponse.json(
+        { error: validation.error.issues[0].message }, 
+        { status: 400 }
+      );
+    }
 
-    const prompt = `${PERSONAS.MARKET}\n\nRaw Market Data:\n${marketData}`;
+    const { marketData } = validation.data;
 
-    const result = await model.generateContentStream(prompt);
+    // 2. Prepare Prompt
+    const prompt = `${PERSONAS.MARKET}\n\nMarket Data:\n${marketData}`;
 
-    const stream = new ReadableStream({
-      async start(controller) {
-        const encoder = new TextEncoder();
-        try {
-          for await (const chunk of result.stream) {
-            const text = chunk.text();
-            if (text) {
-              controller.enqueue(encoder.encode(text));
-            }
-          }
-        } catch (err) {
-          console.error("Stream error:", err);
-          controller.error(err);
-        } finally {
-          controller.close();
-        }
+    const result = await generateStructuredContent(prompt, MarketSynthesisOutputSchema);
+
+    // 3. Return JSON Response with Caching
+    return NextResponse.json(result, {
+      headers: {
+        "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400",
       },
     });
-
-    return new NextResponse(stream, {
-      headers: { "Content-Type": "text/plain; charset=utf-8" }
-    });
   } catch (error) {
-    // Handle Zod validation errors
     if (error instanceof ZodError) {
-      const firstError = error.issues[0];
       return NextResponse.json(
-        { error: firstError?.message || "Validation error" },
-        { status: 400 }
+        { error: "Invalid response format from AI" },
+        { status: 502 }
       );
     }
 
     console.error("Error in market synthesis:", error);
-    const errorMessage = error instanceof Error ? error.message : String(error);
     
-    if (errorMessage.includes("SAFETY")) {
-      return NextResponse.json(
-        { error: "Response blocked by AI Safety Filter. Try rephrasing your input." },
-        { status: 400 }
-      );
-    }
+    const errorMessage = error instanceof Error ? error.message : String(error);
 
     if (errorMessage.includes("API_KEY") || errorMessage.includes("401") || errorMessage.includes("403")) {
       return NextResponse.json(
@@ -73,7 +60,7 @@ export async function POST(req: Request) {
       );
     }
 
-    if (errorMessage.includes("429") || errorMessage.includes("quota") || errorMessage.includes("RESOURCE_EXHAUSTED")) {
+    if (errorMessage.includes("429") || errorMessage.includes("quota")) {
       return NextResponse.json(
         { error: "Rate limit exceeded. Please wait a minute and try again." },
         { status: 429 }
@@ -81,7 +68,7 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json(
-      { error: `API Error: ${errorMessage.substring(0, 100)}` },
+      { error: `Failed to generate market analysis: ${errorMessage.substring(0, 100)}` },
       { status: 500 }
     );
   }

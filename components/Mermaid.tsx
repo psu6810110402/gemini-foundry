@@ -22,13 +22,32 @@ export default function Mermaid({ chart }: { chart: string }) {
           fontFamily: "var(--font-inter), var(--font-ibm-thai), sans-serif",
         });
 
+        // 🧹 Clean up the chart code
+        // 1. Decode HTML entities (e.g. &gt; -> >)
+        const txt = document.createElement("textarea");
+        txt.innerHTML = chart;
+        let cleanChart = txt.value;
+
+        // 2. Fix common AI mistakes
+        cleanChart = cleanChart
+          .replace(/&gt;/g, ">")
+          .replace(/&lt;/g, "<")
+          .replace(/&quot;/g, '"')
+          .replace(/&amp;/g, "&");
+
         const id = `mermaid-${Math.random().toString(36).substr(2, 9)}`;
-        const { svg: renderedSvg } = await mermaid.render(id, chart);
+        const { svg: renderedSvg } = await mermaid.render(id, cleanChart);
         setSvg(renderedSvg);
         setError(null);
       } catch (err) {
         console.error("Mermaid render error:", err);
-        setError("Failed to render diagram");
+        // Optimize error message for users
+        const message = err instanceof Error ? err.message : String(err);
+        setError(
+          message.includes("Parse error")
+            ? "Diagram syntax error"
+            : "Failed to render diagram",
+        );
         setSvg("");
       }
     };

@@ -10,6 +10,8 @@ import {
   TrendingUp,
   Lightbulb,
   PiggyBank,
+  GitBranch,
+  DollarSign,
 } from "lucide-react";
 import dynamic from "next/dynamic";
 import { TermsModal } from "@/components/TermsModal";
@@ -29,6 +31,15 @@ const MarketAnalysis = dynamic(() => import("@/components/MarketAnalysis"), {
 const MVPGenerator = dynamic(() => import("@/components/MVPGenerator"), {
   loading: () => <ComponentLoader />,
 });
+const PivotStrategy = dynamic(() => import("@/components/PivotStrategy"), {
+  loading: () => <ComponentLoader />,
+});
+const FinancialAnalysis = dynamic(
+  () => import("@/components/FinancialAnalysis"),
+  {
+    loading: () => <ComponentLoader />,
+  },
+);
 
 function ComponentLoader() {
   return (
@@ -40,7 +51,7 @@ function ComponentLoader() {
   );
 }
 
-type Mode = "investor" | "market" | "mvp";
+type Mode = "investor" | "market" | "mvp" | "pivot" | "finance";
 
 export default function Home() {
   const [mode, setMode] = useState<Mode>("investor");
@@ -100,6 +111,28 @@ export default function Home() {
         lang === "TH"
           ? "สร้างแผน MVP ที่ใช้ได้จริง"
           : "Build Actionable MVP Plans",
+    },
+    {
+      id: "pivot" as Mode,
+      labelKey: "pivot_mode" as const,
+      icon: GitBranch,
+      gradient: "from-emerald-500 to-teal-500",
+      lightBg: "bg-emerald-50 border-emerald-300 hover:border-emerald-400",
+      darkBg:
+        "dark:bg-emerald-900/40 dark:border-emerald-700 dark:hover:border-emerald-500",
+      description:
+        lang === "TH" ? "หาทางรอดใหม่ (Pivot)" : "Find New Direction",
+    },
+    {
+      id: "finance" as Mode,
+      labelKey: "finance_mode" as const,
+      icon: DollarSign,
+      gradient: "from-blue-600 to-indigo-600",
+      lightBg: "bg-blue-50 border-blue-300 hover:border-blue-400",
+      darkBg:
+        "dark:bg-blue-900/40 dark:border-blue-700 dark:hover:border-blue-500",
+      description:
+        lang === "TH" ? "จำลอง CFO วางแผนการเงิน" : "CFO Financial Simulator",
     },
   ];
 
@@ -179,7 +212,7 @@ export default function Home() {
             </div>
 
             {/* Mode Selector */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               {modes.map((m) => (
                 <button
                   key={m.id}
@@ -220,6 +253,8 @@ export default function Home() {
             )}
             {mode === "market" && <MarketAnalysis />}
             {mode === "mvp" && <MVPGenerator />}
+            {mode === "pivot" && <PivotStrategy />}
+            {mode === "finance" && <FinancialAnalysis />}
           </div>
 
           {/* Footer */}

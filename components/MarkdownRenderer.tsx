@@ -2,8 +2,20 @@
 
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import Mermaid from "./Mermaid";
+import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
+import dynamic from "next/dynamic";
 import { ComponentPropsWithoutRef } from "react";
+import { Loader2 } from "lucide-react";
+
+const Mermaid = dynamic(() => import("./Mermaid"), {
+  loading: () => (
+    <div className="flex items-center justify-center p-8 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800">
+      <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
+      <span className="ml-2 text-slate-500 text-sm">Loading Diagram...</span>
+    </div>
+  ),
+  ssr: false,
+});
 
 interface MarkdownRendererProps {
   content: string;
@@ -29,6 +41,19 @@ export function MarkdownRenderer({
     >
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
+        rehypePlugins={[
+          [
+            rehypeSanitize,
+            {
+              ...defaultSchema,
+              attributes: {
+                ...defaultSchema.attributes,
+                code: [...(defaultSchema.attributes?.code || []), "className"],
+                span: [...(defaultSchema.attributes?.span || []), "className"],
+              },
+            },
+          ],
+        ]}
         components={{
           code(
             props: ComponentPropsWithoutRef<"code"> & { className?: string },

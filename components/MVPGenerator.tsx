@@ -9,22 +9,32 @@ import {
   Download,
   FileText,
   Clock,
+  Rocket,
+  CheckSquare,
+  Users,
+  Code2,
+  ListTodo,
 } from "lucide-react";
-import { MarkdownRenderer } from "@/components/MarkdownRenderer";
 import { AnalysisSkeleton } from "@/components/ui/Skeleton";
-import { exportAnalysisAsMarkdown, downloadAsFile } from "@/lib/export";
-import { generatePDF } from "@/lib/pdfGenerator";
+import { downloadAsFile } from "@/lib/export";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useRateLimit } from "@/hooks/useRateLimit";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
+
+// Types derived from Zod Schema
+import { z } from "zod";
+import { MVPBlueprintOutputSchema } from "@/lib/schemas";
+
+type MVPBlueprintData = z.infer<typeof MVPBlueprintOutputSchema>;
 
 export default function MVPGenerator() {
   const { t, lang } = useLanguage();
   const [idea, setIdea] = useState("");
-  const [blueprint, setBlueprint] = useState<string | null>(null);
+  const [blueprint, setBlueprint] = useState<MVPBlueprintData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  // Rate limiting: 3 requests per minute
+  // Rate limiting
   const { isRateLimited, remainingTime, recordRequest, handle429 } =
     useRateLimit({
       maxRequests: 3,
@@ -49,19 +59,17 @@ export default function MVPGenerator() {
     e.preventDefault();
     if (!idea.trim() || isLoading || isRateLimited) return;
 
-    // Check rate limit before making request
     if (!recordRequest()) {
-      setError(
+      toast.error(
         lang === "TH"
-          ? "กรุณารอสักครู่ก่อนส่งคำขอใหม่"
-          : "Please wait before making another request",
+          ? `กรุณารอ ${remainingTime} วินาที`
+          : `Please wait ${remainingTime}s`,
       );
       return;
     }
 
     setIsLoading(true);
-    setError(null);
-    setBlueprint("");
+    setBlueprint(null);
 
     try {
       const response = await fetch("/api/mvp-blueprint", {
@@ -71,31 +79,18 @@ export default function MVPGenerator() {
       });
 
       if (!response.ok) {
-        // Handle 429 from server
-        if (response.status === 429) {
-          handle429();
-        }
-        const errData = (await response.json()) as { error?: string };
+        if (response.status === 429) handle429();
+        const errData = await response.json();
         throw new Error(errData.error || "Failed to generate");
       }
 
-      if (!response.body) throw new Error("No response body");
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let result = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        const chunk = decoder.decode(value, { stream: true });
-        result += chunk;
-        setBlueprint(result);
-      }
+      const data = await response.json();
+      const parsedBlueprint = MVPBlueprintOutputSchema.parse(data);
+      setBlueprint(parsedBlueprint);
+      toast.success("MVP Blueprint Generated!");
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Unknown error";
-      setError(errorMessage);
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      toast.error(msg);
     } finally {
       setIsLoading(false);
     }
@@ -103,18 +98,19 @@ export default function MVPGenerator() {
 
   const handleExportMarkdown = () => {
     if (!blueprint) return;
-    const markdown = exportAnalysisAsMarkdown(blueprint, "mvp");
-    const timestamp = new Date().toISOString().split("T")[0];
-    downloadAsFile(markdown, `mvp-blueprint-${timestamp}.md`);
+    const content = JSON.stringify(blueprint, null, 2);
+    downloadAsFile(content, "mvp-blueprint.json");
+    toast.success("Exported as JSON");
   };
 
   const handleExportPDF = async () => {
-    if (!blueprint) return;
-    await generatePDF("mvp-export-area", "MVP_Blueprint");
+    toast.info("PDF Export coming soon for Structured Data");
   };
 
+  // --- Render Components ---
+
   return (
-    <div className="w-full max-w-4xl mx-auto glass-panel rounded-2xl overflow-hidden">
+    <div className="w-full max-w-4xl mx-auto bg-white dark:bg-slate-900 border-2 border-slate-300 dark:border-slate-700 rounded-2xl overflow-hidden shadow-xl">
       {/* Header */}
       <div className="bg-gradient-to-r from-amber-500 via-orange-500 to-red-500 text-white p-4">
         <div className="flex items-center justify-between">
@@ -136,16 +132,9 @@ export default function MVPGenerator() {
               <button
                 onClick={handleExportMarkdown}
                 className="flex items-center gap-1 px-3 py-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors text-sm backdrop-blur"
-                title="Export Markdown"
               >
                 <FileText className="w-4 h-4" />
-              </button>
-              <button
-                onClick={handleExportPDF}
-                className="flex items-center gap-1 px-3 py-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors text-sm backdrop-blur"
-              >
-                <Download className="w-4 h-4" />
-                PDF
+                JSON
               </button>
             </div>
           )}
@@ -155,9 +144,9 @@ export default function MVPGenerator() {
       {/* Input Area */}
       <form
         onSubmit={handleSubmit}
-        className="p-4 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"
+        className="p-6 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950"
       >
-        <div className="mb-3">
+        <div className="mb-4">
           <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
             {lang === "TH"
               ? "อธิบายไอเดีย Startup ของคุณ"
@@ -167,7 +156,7 @@ export default function MVPGenerator() {
             value={idea}
             onChange={(e) => setIdea(e.target.value)}
             placeholder={t("idea_placeholder")}
-            className="w-full h-32 p-4 rounded-xl text-base resize-none"
+            className="w-full h-32 p-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-base resize-none focus:ring-2 focus:ring-orange-500 outline-none transition-all placeholder:text-slate-400"
             disabled={isLoading}
           />
         </div>
@@ -192,16 +181,9 @@ export default function MVPGenerator() {
         <button
           type="submit"
           disabled={isLoading || !idea.trim() || isRateLimited}
-          className="w-full md:w-auto flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl font-semibold hover:from-amber-600 hover:to-orange-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md"
+          className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl font-bold hover:from-amber-600 hover:to-orange-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-orange-500/20"
         >
-          {isRateLimited ? (
-            <>
-              <Clock className="w-5 h-5" />
-              {lang === "TH"
-                ? `รอ ${remainingTime}s`
-                : `Wait ${remainingTime}s`}
-            </>
-          ) : isLoading ? (
+          {isLoading ? (
             <>
               <Loader2 className="w-5 h-5 animate-spin" />
               {t("analyzing")}
@@ -216,32 +198,129 @@ export default function MVPGenerator() {
       </form>
 
       {/* Results Area */}
-      <div className="p-4 min-h-[300px] bg-slate-50 dark:bg-slate-900">
-        {error && (
-          <div className="flex items-center gap-2 p-4 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-sm rounded-xl border border-red-200 dark:border-red-800 mb-4">
-            <AlertCircle className="w-5 h-5 flex-shrink-0" />
-            {error}
-          </div>
-        )}
-
-        {isLoading && !blueprint && <AnalysisSkeleton />}
+      <div className="p-6 min-h-[300px] bg-slate-50 dark:bg-slate-900">
+        {isLoading && <AnalysisSkeleton />}
 
         {blueprint && (
-          <div
-            id="mvp-export-area"
-            className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700"
-          >
-            <MarkdownRenderer content={blueprint} />
+          <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            {/* 1. Feature List */}
+            <div className="bg-white dark:bg-slate-800 p-5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+              <h3 className="text-lg font-bold mb-4 flex items-center gap-2 text-indigo-600 dark:text-indigo-400">
+                <Rocket className="w-5 h-5" />
+                Core Features (MVP)
+              </h3>
+              <div className="grid md:grid-cols-2 gap-3">
+                {blueprint.coreFeatures.map((feature, i) => (
+                  <div
+                    key={i}
+                    className="flex gap-3 p-3 bg-slate-50 dark:bg-slate-900/50 rounded-lg border border-slate-100 dark:border-slate-800"
+                  >
+                    <CheckSquare className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
+                    <span className="text-sm text-slate-700 dark:text-slate-300 font-medium">
+                      {feature}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* 2. Tech Stack & Cost Grid */}
+            <div className="grid md:grid-cols-2 gap-6">
+              {/* Tech Stack */}
+              <div className="bg-white dark:bg-slate-800 p-5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                <h3 className="font-bold mb-3 flex items-center gap-2 text-slate-700 dark:text-slate-200">
+                  <Code2 className="w-5 h-5" />
+                  Recommended Tech Stack
+                </h3>
+                <ul className="space-y-3">
+                  {Object.entries(blueprint.techStack).map(([key, value]) => (
+                    <li
+                      key={key}
+                      className="flex items-center justify-between text-sm"
+                    >
+                      <span className="text-slate-500 capitalize">{key}</span>
+                      <span className="font-medium text-slate-800 dark:text-slate-200">
+                        {value}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* Estimated Cost */}
+              <div className="bg-white dark:bg-slate-800 p-5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                <h3 className="font-bold mb-3 flex items-center gap-2 text-slate-700 dark:text-slate-200">
+                  <Users className="w-5 h-5" />
+                  Estimated Cost & Avoid
+                </h3>
+                <div className="mb-4">
+                  <p className="text-sm text-slate-500 mb-1">MVP Total Cost</p>
+                  <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+                    {blueprint.estimatedCost}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-slate-500 mb-2">
+                    Dont Build (Distractions)
+                  </p>
+                  <ul className="space-y-1">
+                    {blueprint.dontBuild.map((item, i) => (
+                      <li
+                        key={i}
+                        className="text-xs text-red-500 flex items-center gap-1"
+                      >
+                        <span className="w-1 h-1 rounded-full bg-red-500" />
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            {/* 3. Development Roadmap */}
+            <div className="bg-slate-100 dark:bg-slate-800/50 p-6 rounded-xl border border-slate-200 dark:border-slate-700">
+              <h3 className="font-bold mb-6 flex items-center gap-2 text-slate-700 dark:text-slate-200">
+                <ListTodo className="w-5 h-5" />
+                Development Roadmap
+              </h3>
+              <div className="relative border-l-2 border-slate-300 dark:border-slate-600 ml-3 space-y-8">
+                {[
+                  {
+                    phase: "Phase 1: MVP (Weeks 1-4)",
+                    tasks: blueprint.roadmap.phase1,
+                  },
+                  {
+                    phase: "Phase 2: Beta (Weeks 5-8)",
+                    tasks: blueprint.roadmap.phase2,
+                  },
+                  {
+                    phase: "Phase 3: Scale (Month 3+)",
+                    tasks: blueprint.roadmap.phase3,
+                  },
+                ].map((step, i) => (
+                  <div key={i} className="ml-6 relative">
+                    <span className="absolute -left-[31px] top-0 flex h-6 w-6 items-center justify-center rounded-full bg-white dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-600 text-xs font-bold text-slate-500">
+                      {i + 1}
+                    </span>
+                    <h4 className="font-bold text-slate-800 dark:text-slate-200 mb-1">
+                      {step.phase}
+                    </h4>
+                    <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+                      {step.tasks}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         )}
 
-        {!blueprint && !isLoading && !error && (
+        {!blueprint && !isLoading && (
           <div className="flex flex-col items-center justify-center h-[250px] text-slate-400 dark:text-slate-500">
-            <Lightbulb className="w-12 h-12 mb-3 opacity-50" />
-            <p className="text-center">
-              {lang === "TH"
-                ? "เริ่มต้นด้วยการอธิบายไอเดียของคุณ"
-                : "Start by describing your startup idea"}
+            <Lightbulb className="w-12 h-12 mb-3 opacity-20" />
+            <p className="text-center opacity-70">
+              Build your roadmap in seconds.
             </p>
           </div>
         )}

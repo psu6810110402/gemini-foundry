@@ -4,12 +4,10 @@ import { InvestorFollowUpSchema } from "@/lib/schemas";
 import { NextResponse } from "next/server";
 import { trackApiUsage } from "@/lib/api-tracking";
 
-// Use Node.js runtime for compatibility
 export const runtime = "nodejs";
 
 export async function POST(req: Request) {
   try {
-    // 0. Check API Key
     if (!isApiConfigured()) {
       return NextResponse.json(
         { error: "GEMINI_API_KEY is not configured" },
@@ -20,7 +18,6 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { history, question } = InvestorFollowUpSchema.parse(body);
 
-    // Start Chat session with existing history
     const chat = model.startChat({
       history: history,
       generationConfig: {
@@ -28,10 +25,8 @@ export async function POST(req: Request) {
       },
     });
 
-    // Send new question
     const result = await chat.sendMessageStream(question);
 
-    // Stream back to client
     const stream = new ReadableStream({
       async start(controller) {
         const encoder = new TextEncoder();
