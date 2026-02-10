@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import {
   LogOut,
   User as UserIcon,
@@ -15,6 +16,7 @@ import { AuthModal } from "@/components/auth/AuthModal";
 
 export function AuthButton() {
   const { user, signOut } = useAuth();
+  const { t } = useLanguage();
   const [isDeleting, setIsDeleting] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
 
@@ -115,7 +117,7 @@ export function AuthButton() {
         className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-lg text-sm font-medium transition-all shadow-md shadow-blue-500/30"
       >
         <UserIcon className="w-4 h-4" />
-        เข้าสู่ระบบ
+        {t("sign_in")}
       </button>
 
       <AuthModal

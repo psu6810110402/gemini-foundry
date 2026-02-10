@@ -7,7 +7,7 @@ import { PERSONAS } from "@/lib/gemini"; // Import personas from shared file
 // validation happens in lib/env.ts on import
 
 // 🚀 Singleton Instance
-const genAI = new GoogleGenerativeAI(env.GEMINI_API_KEY);
+const genAI = new GoogleGenerativeAI(env.GEMINI_API_KEY || "");
 
 // 🛡️ Safety Settings
 const safetySettings = [
