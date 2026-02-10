@@ -1,14 +1,12 @@
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { createBrowserClient } from '@supabase/ssr';
 import { Database } from '@/types/supabase';
 
 // Create a single supabase client for interacting with your database
-import { clientEnv } from "@/lib/env-client";
-
-const supabaseUrl = clientEnv.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = clientEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing Supabase Environment Variables');
 }
 
-export const supabase: SupabaseClient<Database> = createClient<Database>(supabaseUrl, supabaseAnonKey);
+export const supabase = createBrowserClient<Database>(supabaseUrl, supabaseAnonKey);
