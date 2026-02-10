@@ -35,6 +35,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
+        suppressHydrationWarning
         className={`${inter.variable} ${ibmThai.variable} antialiased 
           bg-slate-50 dark:bg-slate-950 
           text-slate-900 dark:text-slate-100 
