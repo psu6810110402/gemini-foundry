@@ -1,5 +1,5 @@
 // app/api/investor-followup/route.ts
-import { model, isApiConfigured } from "@/lib/gemini";
+import { model, isApiConfigured } from "@/lib/gemini-server";
 import { InvestorFollowUpSchema } from "@/lib/schemas";
 import { NextResponse } from "next/server";
 import { trackApiUsage } from "@/lib/api-tracking";

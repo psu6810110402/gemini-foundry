@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase-admin';
+import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { supabase } from '@/lib/supabase'; // Used to check current session if needed
 import { User } from '@supabase/supabase-js';
 
@@ -15,6 +15,7 @@ export async function GET(request: Request) {
   try {
     // 1. Security Check (Optional strict session check here, or rely on Admin Page protection)
     // For now, we'll allow the request but in production middleware should protect this route.
+    const supabaseAdmin = getSupabaseAdmin();
     
     // 2. Fetch users from Auth (contains ban status)
     const { data: { users }, error } = await supabaseAdmin.auth.admin.listUsers();

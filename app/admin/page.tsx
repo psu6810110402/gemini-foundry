@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { supabaseAdmin } from "@/lib/supabase-admin";
+import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { createClient } from "@/lib/supabase/server";
 import {
   Users,
@@ -176,6 +176,7 @@ export default async function AdminDashboard() {
   const supabase = await createClient();
 
   // 1. Security Check
+  const supabaseAdmin = getSupabaseAdmin();
   const {
     data: { user },
   } = await supabase.auth.getUser();

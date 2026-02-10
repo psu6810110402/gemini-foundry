@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase-admin';
+import { getSupabaseAdmin } from '@/lib/supabase-admin';
 import { User } from '@supabase/supabase-js';
 
 // Strict typing for the request body
@@ -18,6 +18,7 @@ type BanResponse = {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
+    const supabaseAdmin = getSupabaseAdmin();
     
     // Type Guard / Validation
     if (!body.userId || !body.action || !['ban', 'unban'].includes(body.action)) {

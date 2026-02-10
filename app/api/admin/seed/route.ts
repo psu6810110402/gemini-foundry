@@ -1,12 +1,15 @@
 // app/api/admin/seed/route.ts
 import { NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase-admin";
+import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { type User } from "@supabase/supabase-js";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   const email = process.env.ADMIN_EMAIL;
   const password = process.env.ADMIN_PASSWORD;
+
+  const supabaseAdmin = getSupabaseAdmin();
 
   if (!email || !password) {
     return NextResponse.json(
@@ -26,7 +29,7 @@ export async function GET() {
       );
     }
 
-    const existingAdmin = users.users.find((u) => u.email === email);
+    const existingAdmin = users.users.find((u: User) => u.email === email);
 
     if (existingAdmin) {
       // Update existing admin with new password and role
